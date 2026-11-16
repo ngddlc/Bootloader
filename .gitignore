@@ -1,0 +1,10 @@
+# Папки загрузок
+download/
+downloads/
+cmd/cli/download/
+cmd/cli/downloads/
+
+# Бинарники и временные файлы
+*.exe
+*.tar.gz
+*.zip
