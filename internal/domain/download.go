@@ -25,3 +25,5 @@ type Progress struct {
 	Percent         float64
 	Speed           float64
 }
+
+type ProgressCallback func(p Progress)

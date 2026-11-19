@@ -30,7 +30,7 @@ func NewMultiDownloader(timeout time.Duration, numWorker int) *MultiDownloader {
 	}
 }
 
-func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string) error {
+func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string, onProgress domain.ProgressCallback) error {
 	file, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -81,12 +81,14 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 					percent = (float64(current) / float64(plan.TotalSize)) * 100
 				}
 
-				fmt.Printf("\r[HomeCloud] Прогресс: %.1f%% (%.2f / %.2f МБ) | Скорость: %.2f МБ/с",
-					percent,
-					float64(current)/(1024*1024),
-					float64(plan.TotalSize)/(1024*1024),
-					speed/(1024*1024),
-				)
+				if onProgress != nil {
+					onProgress(domain.Progress{
+						DownloadedBytes: current,
+						TotalBytes:      plan.TotalSize,
+						Percent:         percent,
+						Speed:           speed,
+					})
+				}
 
 				prevDownloaded = current
 				prevTime = now
@@ -117,14 +119,21 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 		}(i, start, end)
 	}
 	wg.Wait()
+	close(progressDone)
 
 	fmt.Printf("\r[HomeCloud] Прогресс: 100.0%% (%.2f / %.2f МБ) | Скачивание завершено!      \n",
 		float64(plan.TotalSize)/(1024*1024),
 		float64(plan.TotalSize)/(1024*1024),
 	)
 
-	close(progressDone)
-	fmt.Println()
+	if downloadErr == nil && onProgress != nil {
+		onProgress(domain.Progress{
+			DownloadedBytes: plan.TotalSize,
+			TotalBytes:      plan.TotalSize,
+			Percent:         100.0,
+			Speed:           0,
+		})
+	}
 
 	if downloadErr != nil {
 		return downloadErr

@@ -3,6 +3,7 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"homecloud/internal/domain"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,7 +23,7 @@ func NewManager(timeout time.Duration, numWorkers int) *Manager {
 	}
 }
 
-func (m *Manager) Download(ctx context.Context, rawURL, destDir string) error {
+func (m *Manager) Download(ctx context.Context, rawURL, destDir string, onProgress domain.ProgressCallback) error {
 	if destDir != "" {
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return fmt.Errorf("failed to create destination directory: %w", err)
@@ -43,8 +44,8 @@ func (m *Manager) Download(ctx context.Context, rawURL, destDir string) error {
 	//Принимает решение о типе загрузки
 	if plan.IsMultiPart && plan.TotalSize > 0 {
 		fmt.Printf("[Manager] Сервер поддерживает Range. Запуск многопоточной загрузки (%d потоков)...\n", m.multiDownloader.numWorkers)
-		return m.multiDownloader.Download(ctx, plan, destPath)
+		return m.multiDownloader.Download(ctx, plan, destPath, onProgress)
 	}
 	fmt.Println("[Manager] Сервер НЕ поддерживает Range или размер неизвестен. Откат на однопоточную загрузку...")
-	return m.singleDownloader.Download(ctx, plan, destPath)
+	return m.singleDownloader.Download(ctx, plan, destPath, onProgress)
 }

@@ -22,7 +22,7 @@ func NewSingleDownloader(timeout time.Duration) *SingleDownloader {
 	}
 }
 
-func (d *SingleDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string) error {
+func (d *SingleDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string, onProgress domain.ProgressCallback) error {
 	file, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -50,6 +50,14 @@ func (d *SingleDownloader) Download(ctx context.Context, plan *domain.DownloadPl
 	if err != nil {
 		return fmt.Errorf("failed to save data: %w", err)
 	}
-	fmt.Printf("Скачивание завершено, скачано байт: %d", written)
+
+	if onProgress != nil {
+		onProgress(domain.Progress{
+			DownloadedBytes: written,
+			TotalBytes:      written,
+			Percent:         100.0,
+			Speed:           0,
+		})
+	}
 	return nil
 }
