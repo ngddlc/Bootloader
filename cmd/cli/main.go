@@ -1,39 +1,60 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
 
-	"homecloud/internal/domain"
 	"homecloud/internal/downloader"
+	"homecloud/internal/service"
+	"homecloud/internal/storage"
 )
 
 func main() {
-	ctx := context.Background()
-
-	mgr := downloader.NewManager(10*time.Second, 4)
-
-	testURL := "https://go.dev/dl/go1.22.0.src.tar.gz"
-
-	destDir := "./download"
-
-	fmt.Println("Запуск загрузки через HomeCloud Manager")
-
-	onProgress := func(p domain.Progress) {
-		fmt.Printf("\r[HomeCloud CLI] Прогресс: %.1f%% (%.2f / %.2f МБ) | Скорость: %.2f МБ/с",
-			p.Percent,
-			float64(p.DownloadedBytes)/(1024*1024),
-			float64(p.TotalBytes)/(1024*1024),
-			p.Speed/(1024*1024),
-		)
-	}
-
-	err := mgr.Download(ctx, testURL, destDir, onProgress)
+	// 1. Инициализируем базу данных SQLite (файл homecloud.db создастся сам)
+	store, err := storage.NewStorage("homecloud.db")
 	if err != nil {
-		log.Fatalf("Ошибка разведки: %v", err)
+		log.Fatalf("Ошибка базы данных: %v", err)
+	}
+	defer store.Close()
+
+	// 2. Смотрим, что уже есть в базе (история)
+	tasks, err := store.GetAllTasks()
+	if err != nil {
+		log.Fatalf("Ошибка чтения истории: %v", err)
+	}
+	fmt.Printf("История в БД: найдено задач: %d\n", len(tasks))
+	for _, t := range tasks {
+		fmt.Printf("- [%s] %s (Статус: %s)\n", t.ID, t.Filename, t.Status)
 	}
 
-	fmt.Println("\nФайл успешно сохранён в папку:", destDir)
+	// 3. Создаём сетевой движок и наш Менеджер задач
+	dl := downloader.NewManager(10*time.Second, 4)
+	tm := service.NewTaskManager(dl, store, "./download")
+
+	// 4. Запускаем скачивание новой задачи
+	testURL := "https://go.dev/dl/go1.22.0.src.tar.gz"
+	fmt.Println("Запускаем задачу через TaskManager...")
+
+	task, err := tm.StartDownload(testURL)
+	if err != nil {
+		log.Fatalf("Ошибка старта: %v", err)
+	}
+
+	fmt.Printf("Задача успешно запущена в фоне! ID задачи: %s\n", task.ID)
+	fmt.Println("Ожидаем завершения фоновой загрузки...")
+
+	// 5. Временный цикл ожидания для консоли (в Wails приложение будет просто открыто)
+	for {
+		time.Sleep(500 * time.Millisecond)
+
+		// Проверяем статус в памяти
+		if task.Status != "DOWNLOADING" {
+			fmt.Printf("\nЗагрузка завершилась со статусом: %s!\n", task.Status)
+			if task.Error != "" {
+				fmt.Printf("Ошибка: %s\n", task.Error)
+			}
+			break
+		}
+	}
 }

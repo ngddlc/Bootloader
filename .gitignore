@@ -8,3 +8,4 @@ cmd/cli/downloads/
 *.exe
 *.tar.gz
 *.zip
+*.db

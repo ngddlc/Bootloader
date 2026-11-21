@@ -9,6 +9,7 @@ const (
 	StatusPaused      DownloadStatus = "PAUSED"
 	StatusCompleted   DownloadStatus = "COMPLETED"
 	StatusFailed      DownloadStatus = "FAILED"
+	StatusCanceled    DownloadStatus = "CANCELED"
 )
 
 type DownloadPlan struct {
@@ -27,3 +28,14 @@ type Progress struct {
 }
 
 type ProgressCallback func(p Progress)
+
+type DownloadTask struct {
+	ID        string         `json:"id"`
+	URL       string         `json:"url"`
+	Filename  string         `json:"filename"`
+	DestPath  string         `json:"dest_path"`
+	TotalSize int64          `json:"total_size"`
+	Progress  Progress       `json:"progress"`
+	Status    DownloadStatus `json:"status"`
+	Error     string         `json:"error"`
+}
