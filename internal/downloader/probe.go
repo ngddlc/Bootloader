@@ -45,13 +45,18 @@ func (p *Prober) Probe(ctx context.Context, rawURL string) (*domain.DownloadPlan
 
 	filename := extractFilename(resp, rawURL)
 
+	finalURL := rawURL
+	if resp.Request != nil && resp.Request.URL != nil {
+		finalURL = resp.Request.URL.String()
+	}
+
 	switch resp.StatusCode {
 	case http.StatusPartialContent:
 		contentRange := resp.Header.Get("Content-Range")
 		totalSize := parseContentRange(contentRange)
 
 		return &domain.DownloadPlan{
-			URL:         rawURL,
+			URL:         finalURL,
 			Filename:    filename,
 			TotalSize:   totalSize,
 			IsMultiPart: true,
@@ -60,7 +65,7 @@ func (p *Prober) Probe(ctx context.Context, rawURL string) (*domain.DownloadPlan
 
 	case http.StatusOK:
 		return &domain.DownloadPlan{
-			URL:         rawURL,
+			URL:         finalURL,
 			Filename:    filename,
 			TotalSize:   resp.ContentLength,
 			IsMultiPart: false,

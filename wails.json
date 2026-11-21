@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "homecloud",
+  "outputfilename": "HomeCloud",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "ngddlc",
+    "email": "leonidcernavskoj@gmail.com"
+  },
+  "info": {
+    "companyName": "HomeCloud",
+    "productName": "HomeCloud Downloader",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026"
+  }
+}

@@ -23,29 +23,31 @@ func NewManager(timeout time.Duration, numWorkers int) *Manager {
 	}
 }
 
-func (m *Manager) Download(ctx context.Context, rawURL, destDir string, onProgress domain.ProgressCallback) error {
+func (m *Manager) Probe(ctx context.Context, rawURL string) (*domain.DownloadPlan, error) {
+	return m.prober.Probe(ctx, rawURL)
+}
+
+func (m *Manager) DownloadPlan(ctx context.Context, plan *domain.DownloadPlan, destDir string, onProgress domain.ProgressCallback) error {
 	if destDir != "" {
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return fmt.Errorf("failed to create destination directory: %w", err)
 		}
 	}
 
-	fmt.Println("[Manager] Разведка URL...")
-	plan, err := m.prober.Probe(ctx, rawURL)
+	destPath := filepath.Join(destDir, plan.Filename)
+
+	if plan.IsMultiPart && plan.TotalSize > 0 {
+		return m.multiDownloader.Download(ctx, plan, destPath, onProgress)
+	}
+
+	return m.singleDownloader.Download(ctx, plan, destPath, onProgress)
+}
+
+func (m *Manager) Download(ctx context.Context, rawURL, destDir string, onProgress domain.ProgressCallback) error {
+	plan, err := m.Probe(ctx, rawURL)
 	if err != nil {
 		return fmt.Errorf("probe failed: %w", err)
 	}
 
-	destPath := filepath.Join(destDir, plan.Filename)
-	fmt.Printf("[Manager] Файл: %s | Размер: %.2f МБ\n",
-		plan.Filename,
-		float64(plan.TotalSize)/(1024*1024))
-
-	//Принимает решение о типе загрузки
-	if plan.IsMultiPart && plan.TotalSize > 0 {
-		fmt.Printf("[Manager] Сервер поддерживает Range. Запуск многопоточной загрузки (%d потоков)...\n", m.multiDownloader.numWorkers)
-		return m.multiDownloader.Download(ctx, plan, destPath, onProgress)
-	}
-	fmt.Println("[Manager] Сервер НЕ поддерживает Range или размер неизвестен. Откат на однопоточную загрузку...")
-	return m.singleDownloader.Download(ctx, plan, destPath, onProgress)
+	return m.DownloadPlan(ctx, plan, destDir, onProgress)
 }

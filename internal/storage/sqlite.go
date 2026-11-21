@@ -56,6 +56,9 @@ func (s *Storage) SaveTask(task *domain.DownloadTask) error {
 	INSERT INTO tasks (id, url, filename, dest_path, total_size, downloaded_bytes, status, error)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
+		filename = excluded.filename,
+		dest_path = excluded.dest_path,
+		total_size = excluded.total_size,
 		downloaded_bytes = excluded.downloaded_bytes,
 		status = excluded.status,
 		error = excluded.error;`

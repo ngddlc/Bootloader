@@ -5,6 +5,7 @@ cmd/cli/download/
 cmd/cli/downloads/
 
 # Бинарники и временные файлы
+build/bin/
 *.exe
 *.tar.gz
 *.zip

@@ -22,9 +22,20 @@ func NewMultiDownloader(timeout time.Duration, numWorker int) *MultiDownloader {
 		numWorker = 4
 	}
 
+	tr := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   20,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableCompression:    true,
+	}
+
 	return &MultiDownloader{
 		client: &http.Client{
-			Timeout: timeout,
+			Transport: tr,
+			Timeout:   timeout,
 		},
 		numWorkers: numWorker,
 	}
@@ -61,6 +72,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 	go func() {
 		var prevDownloaded int64
 		prevTime := time.Now()
+		var smoothedSpeed float64
 
 		for {
 			select {
@@ -71,9 +83,14 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 				deltaBytes := current - prevDownloaded
 				deltaTime := now.Sub(prevTime).Seconds()
 
-				var speed float64
-				if deltaTime > 0 {
-					speed = float64(deltaBytes) / deltaTime
+				if deltaTime > 0 && deltaBytes >= 0 {
+					instantSpeed := float64(deltaBytes) / deltaTime
+					if smoothedSpeed == 0 {
+						smoothedSpeed = instantSpeed
+					} else {
+						// Экспоненциальное сглаживание скорости (EMA) для плавных показаний в GUI
+						smoothedSpeed = smoothedSpeed*0.65 + instantSpeed*0.35
+					}
 				}
 
 				var percent float64
@@ -86,7 +103,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 						DownloadedBytes: current,
 						TotalBytes:      plan.TotalSize,
 						Percent:         percent,
-						Speed:           speed,
+						Speed:           smoothedSpeed,
 					})
 				}
 
@@ -121,22 +138,22 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 	wg.Wait()
 	close(progressDone)
 
-	fmt.Printf("\r[HomeCloud] Прогресс: 100.0%% (%.2f / %.2f МБ) | Скачивание завершено!      \n",
-		float64(plan.TotalSize)/(1024*1024),
-		float64(plan.TotalSize)/(1024*1024),
-	)
+	// Если произошла ошибка или пользователь нажал "Отмена"
+	if downloadErr != nil {
+		return downloadErr
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
-	if downloadErr == nil && onProgress != nil {
+	// Уведомляем об успешном 100% завершении
+	if onProgress != nil {
 		onProgress(domain.Progress{
 			DownloadedBytes: plan.TotalSize,
 			TotalBytes:      plan.TotalSize,
 			Percent:         100.0,
 			Speed:           0,
 		})
-	}
-
-	if downloadErr != nil {
-		return downloadErr
 	}
 
 	return nil
@@ -149,7 +166,8 @@ func (d *MultiDownloader) downloadChunc(ctx context.Context, rawURL string, star
 	}
 
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
-	req.Header.Set("User-Agent", "HomeCloud-Downloader/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+	req.Header.Set("Accept-Encoding", "identity")
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -165,7 +183,9 @@ func (d *MultiDownloader) downloadChunc(ctx context.Context, rawURL string, star
 
 	reader := newProgressReader(resp.Body, counter)
 
-	_, err = io.Copy(writer, reader)
+	// Буфер 128 КБ снижает число системных вызовов WriteAt в Windows
+	buf := make([]byte, 128*1024)
+	_, err = io.CopyBuffer(writer, reader, buf)
 	if err != nil {
 		return fmt.Errorf("failed to copy chunk data to file: %w", err)
 	}

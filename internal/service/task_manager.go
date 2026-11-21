@@ -9,15 +9,17 @@ import (
 	"homecloud/internal/downloader"
 	"homecloud/internal/storage"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
 type TaskManager struct {
-	downloader  *downloader.Manager
-	storage     *storage.Storage
-	downloadDir string
-	cancels     map[string]context.CancelFunc
-	mu          sync.RWMutex
+	downloader     *downloader.Manager
+	storage        *storage.Storage
+	downloadDir    string
+	cancels        map[string]context.CancelFunc
+	mu             sync.RWMutex
+	onTaskProgress func(task *domain.DownloadTask)
 }
 
 func NewTaskManager(dl *downloader.Manager, store *storage.Storage, downloadDir string) *TaskManager {
@@ -27,6 +29,12 @@ func NewTaskManager(dl *downloader.Manager, store *storage.Storage, downloadDir 
 		downloadDir: downloadDir,
 		cancels:     make(map[string]context.CancelFunc),
 	}
+}
+
+func (tm *TaskManager) SetOnTaskProgress(fn func(task *domain.DownloadTask)) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.onTaskProgress = fn
 }
 
 func (tm *TaskManager) StartDownload(rawURL string) (*domain.DownloadTask, error) {
@@ -62,11 +70,36 @@ func (tm *TaskManager) runDownload(ctx context.Context, task *domain.DownloadTas
 		tm.mu.Unlock()
 	}()
 
-	onProgress := func(p domain.Progress) {
-		task.Progress = p
+	// 1. Быстрая разведка: сразу определяем реальное имя и размер файла
+	plan, err := tm.downloader.Probe(ctx, task.URL)
+	if err != nil {
+		task.Status = domain.StatusFailed
+		task.Error = err.Error()
+		_ = tm.storage.UpdateTaskStatus(task.ID, domain.StatusFailed, err.Error())
+		tm.notifyFinal(task)
+		return
 	}
 
-	err := tm.downloader.Download(ctx, task.URL, tm.downloadDir, onProgress)
+	// 2. Мгновенно обновляем карточку: реальное имя, размер и путь!
+	task.Filename = plan.Filename
+	task.TotalSize = plan.TotalSize
+	task.DestPath = filepath.Join(tm.downloadDir, plan.Filename)
+	_ = tm.storage.SaveTask(task)
+	tm.notifyFinal(task)
+
+	onProgress := func(p domain.Progress) {
+		task.Progress = p
+
+		tm.mu.RLock()
+		notify := tm.onTaskProgress
+		tm.mu.RUnlock()
+		if notify != nil {
+			notify(task)
+		}
+	}
+
+	// 3. Запускаем скачивание по готовому плану
+	err = tm.downloader.DownloadPlan(ctx, plan, tm.downloadDir, onProgress)
 	if err != nil {
 		if ctx.Err() == context.Canceled {
 			task.Status = domain.StatusCanceled
@@ -75,17 +108,32 @@ func (tm *TaskManager) runDownload(ctx context.Context, task *domain.DownloadTas
 			if task.DestPath != "" {
 				_ = os.Remove(task.DestPath)
 			}
+			tm.notifyFinal(task)
 			return
 		}
 
 		task.Status = domain.StatusFailed
 		task.Error = err.Error()
 		_ = tm.storage.UpdateTaskStatus(task.ID, domain.StatusFailed, err.Error())
+		tm.notifyFinal(task)
 		return
 	}
 
 	task.Status = domain.StatusCompleted
-	_ = tm.storage.UpdateTaskStatus(task.ID, domain.StatusCompleted, "")
+	task.Progress.Percent = 100
+	task.Progress.DownloadedBytes = task.TotalSize
+	task.Progress.Speed = 0
+	_ = tm.storage.SaveTask(task)
+	tm.notifyFinal(task)
+}
+
+func (tm *TaskManager) notifyFinal(task *domain.DownloadTask) {
+	tm.mu.RLock()
+	notify := tm.onTaskProgress
+	tm.mu.RUnlock()
+	if notify != nil {
+		notify(task)
+	}
 }
 
 func generateID() string {

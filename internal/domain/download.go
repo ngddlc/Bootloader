@@ -21,10 +21,10 @@ type DownloadPlan struct {
 }
 
 type Progress struct {
-	DownloadedBytes int64
-	TotalBytes      int64
-	Percent         float64
-	Speed           float64
+	DownloadedBytes int64   `json:"downloaded_bytes"`
+	TotalBytes      int64   `json:"total_bytes"`
+	Percent         float64 `json:"percent"`
+	Speed           float64 `json:"speed"`
 }
 
 type ProgressCallback func(p Progress)
