@@ -41,7 +41,11 @@ func NewMultiDownloader(timeout time.Duration, numWorker int) *MultiDownloader {
 	}
 }
 
-func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string, onProgress domain.ProgressCallback) error {
+func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPlan, destPath string, workers int, onProgress domain.ProgressCallback) error {
+	if workers <= 0 {
+		workers = d.numWorkers
+	}
+
 	file, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -56,7 +60,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	chuncSize := plan.TotalSize / int64(d.numWorkers)
+	chunkSize := plan.TotalSize / int64(workers)
 
 	var wg sync.WaitGroup
 	var downloadErr error
@@ -113,11 +117,11 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 		}
 	}()
 
-	for i := 0; i < d.numWorkers; i++ {
-		start := int64(i) * chuncSize
-		end := start + chuncSize - 1
+	for i := 0; i < workers; i++ {
+		start := int64(i) * chunkSize
+		end := start + chunkSize - 1
 
-		if i == d.numWorkers-1 {
+		if i == workers-1 {
 			end = plan.TotalSize - 1
 		}
 
@@ -126,7 +130,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 		go func(chunkIndex int, chunkStart, chunkEnd int64) {
 			defer wg.Done()
 
-			err := d.downloadChunc(ctx, plan.URL, chunkStart, chunkEnd, file, &downloaded)
+			err := d.downloadChunk(ctx, plan.URL, chunkStart, chunkEnd, file, &downloaded)
 			if err != nil {
 				errOnce.Do(func() {
 					downloadErr = fmt.Errorf("chunk %d [%d-%d] failed: %w", chunkIndex, chunkStart, chunkEnd, err)
@@ -159,7 +163,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 	return nil
 }
 
-func (d *MultiDownloader) downloadChunc(ctx context.Context, rawURL string, start, end int64, file *os.File, counter *atomic.Int64) error {
+func (d *MultiDownloader) downloadChunk(ctx context.Context, rawURL string, start, end int64, file *os.File, counter *atomic.Int64) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return fmt.Errorf("create chunk request failed: %w", err)

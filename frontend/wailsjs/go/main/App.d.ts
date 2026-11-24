@@ -4,8 +4,12 @@ import {domain} from '../models';
 
 export function CancelDownload(arg1:string):Promise<void>;
 
+export function DeleteTask(arg1:string,arg2:boolean):Promise<void>;
+
 export function GetTasks():Promise<Array<domain.DownloadTask>>;
 
 export function OpenFileFolder(arg1:string):Promise<void>;
 
-export function StartDownload(arg1:string):Promise<domain.DownloadTask>;
+export function SelectDownloadFolder():Promise<string>;
+
+export function StartDownload(arg1:string,arg2:string,arg3:number):Promise<domain.DownloadTask>;

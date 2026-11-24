@@ -6,6 +6,10 @@ export function CancelDownload(arg1) {
   return window['go']['main']['App']['CancelDownload'](arg1);
 }
 
+export function DeleteTask(arg1, arg2) {
+  return window['go']['main']['App']['DeleteTask'](arg1, arg2);
+}
+
 export function GetTasks() {
   return window['go']['main']['App']['GetTasks']();
 }
@@ -14,6 +18,10 @@ export function OpenFileFolder(arg1) {
   return window['go']['main']['App']['OpenFileFolder'](arg1);
 }
 
-export function StartDownload(arg1) {
-  return window['go']['main']['App']['StartDownload'](arg1);
+export function SelectDownloadFolder() {
+  return window['go']['main']['App']['SelectDownloadFolder']();
+}
+
+export function StartDownload(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartDownload'](arg1, arg2, arg3);
 }

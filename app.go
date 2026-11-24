@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -45,12 +46,19 @@ func (a *App) startup(ctx context.Context) {
 	})
 }
 
-// StartDownload запускает скачивание
-func (a *App) StartDownload(rawURL string) (*domain.DownloadTask, error) {
+// StartDownload запускает скачивание (с поддержкой выбора папки и числа потоков)
+func (a *App) StartDownload(rawURL, customDir string, numWorkers int) (*domain.DownloadTask, error) {
 	if a.tm == nil {
 		return nil, fmt.Errorf("task manager not initialized")
 	}
-	return a.tm.StartDownload(rawURL)
+	return a.tm.StartDownload(rawURL, customDir, numWorkers)
+}
+
+// SelectDownloadFolder открывает системное диалоговое окно выбора папки Windows
+func (a *App) SelectDownloadFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Выберите папку для сохранения файлов",
+	})
 }
 
 // CancelDownload отменяет задачу по ID
@@ -69,12 +77,29 @@ func (a *App) GetTasks() ([]domain.DownloadTask, error) {
 	return a.tm.GetTasks()
 }
 
-// OpenFileFolder открывает проводник с выделенным загруженным файлом
+// DeleteTask удаляет запись о задаче из базы данных и опционально удаляет файл с диска
+func (a *App) DeleteTask(taskID string, deleteFile bool) error {
+	if a.tm == nil {
+		return fmt.Errorf("task manager not initialized")
+	}
+	return a.tm.DeleteTask(taskID, deleteFile)
+}
+
+// OpenFileFolder открывает проводник с выделенным загруженным файлом (или саму папку, если файл был перемещён/удалён)
 func (a *App) OpenFileFolder(filePath string) error {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		absPath = filePath
 	}
-	cmd := exec.Command("explorer.exe", "/select,", absPath)
-	return cmd.Start()
+
+	if _, err := os.Stat(absPath); err == nil {
+		return exec.Command("explorer.exe", "/select,", absPath).Start()
+	}
+
+	dir := filepath.Dir(absPath)
+	if _, err := os.Stat(dir); err == nil {
+		return exec.Command("explorer.exe", dir).Start()
+	}
+
+	return fmt.Errorf("path not found: %s", filePath)
 }

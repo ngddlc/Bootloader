@@ -23,6 +23,11 @@ export namespace domain {
 	    url: string;
 	    filename: string;
 	    dest_path: string;
+	    category_id: number;
+	    category: string;
+	    checksum: string;
+	    duplicate_of?: string;
+	    threads?: number;
 	    total_size: number;
 	    progress: Progress;
 	    status: string;
@@ -38,6 +43,11 @@ export namespace domain {
 	        this.url = source["url"];
 	        this.filename = source["filename"];
 	        this.dest_path = source["dest_path"];
+	        this.category_id = source["category_id"];
+	        this.category = source["category"];
+	        this.checksum = source["checksum"];
+	        this.duplicate_of = source["duplicate_of"];
+	        this.threads = source["threads"];
 	        this.total_size = source["total_size"];
 	        this.progress = this.convertValues(source["progress"], Progress);
 	        this.status = source["status"];
