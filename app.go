@@ -35,7 +35,7 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 
-	// Инициализируем сетевой движок (8 параллельных потоков)
+	// Инициализируем сетевой движок
 	dl := downloader.NewManager(10*time.Second, 8)
 
 	// Инициализируем менеджер задач
@@ -46,7 +46,7 @@ func (a *App) startup(ctx context.Context) {
 	})
 }
 
-// StartDownload запускает скачивание (с поддержкой выбора папки и числа потоков)
+// StartDownload запускает скачивание
 func (a *App) StartDownload(rawURL, customDir string, numWorkers int) (*domain.DownloadTask, error) {
 	if a.tm == nil {
 		return nil, fmt.Errorf("task manager not initialized")
@@ -85,7 +85,7 @@ func (a *App) DeleteTask(taskID string, deleteFile bool) error {
 	return a.tm.DeleteTask(taskID, deleteFile)
 }
 
-// OpenFileFolder открывает проводник с выделенным загруженным файлом (или саму папку, если файл был перемещён/удалён)
+// OpenFileFolder открывает проводник с выделенным загруженным файлом
 func (a *App) OpenFileFolder(filePath string) error {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {

@@ -78,7 +78,7 @@ func (tm *TaskManager) runDownload(ctx context.Context, task *domain.DownloadTas
 		tm.mu.Unlock()
 	}()
 
-	// Быстрая сетевая разведка (размер, поддержка Range, реальное имя файла)
+	// Быстрая сетевая разведка
 	plan, err := tm.downloader.Probe(ctx, task.URL)
 	if err != nil {
 		task.Status = domain.StatusFailed
@@ -88,7 +88,7 @@ func (tm *TaskManager) runDownload(ctx context.Context, task *domain.DownloadTas
 		return
 	}
 
-	// Определение категории и итогового пути сохранения (с защитой от коллизий)
+	// Определение категории и итогового пути сохранения
 	destPath, uniqueName, cat, err := category.ResolveDestination(tm.downloadDir, customDir, plan.Filename)
 	if err != nil {
 		task.Status = domain.StatusFailed
@@ -104,6 +104,10 @@ func (tm *TaskManager) runDownload(ctx context.Context, task *domain.DownloadTas
 	task.CategoryID = cat.ID
 	task.Category = cat.Name
 	task.TotalSize = plan.TotalSize
+	task.IsMultiPart = plan.IsMultiPart && plan.TotalSize > 0
+	if !task.IsMultiPart {
+		task.Threads = 1
+	}
 	_ = tm.storage.SaveTask(task)
 	tm.notifyFinal(task)
 

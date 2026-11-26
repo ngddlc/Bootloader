@@ -8,8 +8,7 @@ import (
 	"os"
 )
 
-// CalculateSHA256 вычисляет контрольную сумму файла потоково через буфер 128 КБ.
-// Потоковое чтение гарантирует минимальное потребление RAM даже для файлов размером в десятки гигабайт.
+// CalculateSHA256 вычисляет контрольную сумму файла потоково через буфер 128 КБ
 func CalculateSHA256(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {

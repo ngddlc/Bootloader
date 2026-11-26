@@ -65,6 +65,7 @@ func (s *Storage) initSchema() error {
 		category_id INTEGER DEFAULT 5 REFERENCES categories(id),
 		checksum TEXT NOT NULL DEFAULT '',
 		threads INTEGER DEFAULT 8,
+		is_multi_part BOOLEAN DEFAULT 0,
 		total_size INTEGER NOT NULL,
 		downloaded_bytes INTEGER NOT NULL DEFAULT 0,
 		status TEXT NOT NULL,
@@ -78,6 +79,7 @@ func (s *Storage) initSchema() error {
 	_, _ = s.db.Exec(`ALTER TABLE tasks ADD COLUMN category_id INTEGER DEFAULT 5 REFERENCES categories(id);`)
 	_, _ = s.db.Exec(`ALTER TABLE tasks ADD COLUMN checksum TEXT NOT NULL DEFAULT '';`)
 	_, _ = s.db.Exec(`ALTER TABLE tasks ADD COLUMN threads INTEGER DEFAULT 8;`)
+	_, _ = s.db.Exec(`ALTER TABLE tasks ADD COLUMN is_multi_part BOOLEAN DEFAULT 0;`)
 	_, _ = s.db.Exec(`ALTER TABLE tasks DROP COLUMN category;`)
 
 	return nil
@@ -97,15 +99,21 @@ func (s *Storage) SaveTask(task *domain.DownloadTask) error {
 		threads = 8
 	}
 
+	isMultiPartInt := 0
+	if task.IsMultiPart {
+		isMultiPartInt = 1
+	}
+
 	query := `
-	INSERT INTO tasks (id, url, filename, dest_path, category_id, checksum, threads, total_size, downloaded_bytes, status, error)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO tasks (id, url, filename, dest_path, category_id, checksum, threads, is_multi_part, total_size, downloaded_bytes, status, error)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		filename = excluded.filename,
 		dest_path = excluded.dest_path,
 		category_id = excluded.category_id,
 		checksum = excluded.checksum,
 		threads = excluded.threads,
+		is_multi_part = excluded.is_multi_part,
 		total_size = excluded.total_size,
 		downloaded_bytes = excluded.downloaded_bytes,
 		status = excluded.status,
@@ -118,6 +126,7 @@ func (s *Storage) SaveTask(task *domain.DownloadTask) error {
 		catID,
 		task.Checksum,
 		threads,
+		isMultiPartInt,
 		task.TotalSize,
 		task.Progress.DownloadedBytes,
 		string(task.Status),
@@ -191,7 +200,9 @@ func (s *Storage) GetAllTasks() ([]domain.DownloadTask, error) {
 		t.id, t.url, t.filename, t.dest_path, 
 		COALESCE(c.id, 5) AS category_id,
 		COALESCE(c.name, 'Другое') AS category_name,
-		t.checksum, COALESCE(t.threads, 8) AS threads, t.total_size, t.downloaded_bytes, t.status, t.error 
+		t.checksum, COALESCE(t.threads, 8) AS threads,
+		COALESCE(t.is_multi_part, 0) AS is_multi_part,
+		t.total_size, t.downloaded_bytes, t.status, t.error 
 	FROM tasks t
 	LEFT JOIN categories c ON t.category_id = c.id
 	ORDER BY t.rowid ASC;`
@@ -207,6 +218,7 @@ func (s *Storage) GetAllTasks() ([]domain.DownloadTask, error) {
 		var t domain.DownloadTask
 		var statusStr string
 		var downloadedBytes int64
+		var isMultiPartInt int
 
 		err := rows.Scan(
 			&t.ID,
@@ -217,6 +229,7 @@ func (s *Storage) GetAllTasks() ([]domain.DownloadTask, error) {
 			&t.Category,
 			&t.Checksum,
 			&t.Threads,
+			&isMultiPartInt,
 			&t.TotalSize,
 			&downloadedBytes,
 			&statusStr,
@@ -226,6 +239,8 @@ func (s *Storage) GetAllTasks() ([]domain.DownloadTask, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan task row: %w", err)
 		}
+
+		t.IsMultiPart = isMultiPartInt == 1
 
 		t.Status = domain.DownloadStatus(statusStr)
 		t.Progress.DownloadedBytes = downloadedBytes

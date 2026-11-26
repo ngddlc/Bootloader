@@ -9,14 +9,13 @@ import (
 
 // Category описывает тематическую категорию файлов
 type Category struct {
-	ID         int      `json:"id"`          // Первичный ключ (1, 2, 3...)
-	Name       string   `json:"name"`        // "Архивы", "Документы" и т.д.
-	FolderName string   `json:"folder_name"` // Имя подпапки на диске
-	Icon       string   `json:"icon"`        // Иконка/эмодзи для UI
-	Extensions []string `json:"extensions"`  // Список расширений
+	ID         int      `json:"id"`
+	Name       string   `json:"name"`
+	FolderName string   `json:"folder_name"`
+	Icon       string   `json:"icon"`
+	Extensions []string `json:"extensions"` // Список расширений
 }
 
-// Предопределенный список категорий согласно ТЗ курсового проекта
 var Categories = []Category{
 	{
 		ID:         1,
@@ -59,7 +58,7 @@ var Categories = []Category{
 	},
 }
 
-// Detect определяет категорию файла по его имени/расширению
+// Detect определяет категорию файла
 func Detect(filename string) Category {
 	lower := strings.ToLower(filename)
 
@@ -75,10 +74,8 @@ func Detect(filename string) Category {
 	return Categories[len(Categories)-1]
 }
 
-// ResolveDestination вычисляет итоговый путь для сохранения файла:
-// 1. Если customDir не пустой — сохраняет в выбранную пользователем папку.
-// 2. Если customDir пустой — автоматически кладёт в подпапку категории (download/Архивы/...).
-// 3. Защита от перезаписи: если файл с таким именем уже есть, добавляет (1), (2) и т.д.
+// ResolveDestination вычисляет итоговый путь для сохранения файла
+// если файл с таким именем уже есть, добавляет (1)
 func ResolveDestination(baseDir, customDir, filename string) (finalPath string, uniqueFilename string, cat Category, err error) {
 	cat = Detect(filename)
 
@@ -98,7 +95,7 @@ func ResolveDestination(baseDir, customDir, filename string) (finalPath string, 
 	return finalPath, uniqueFilename, cat, nil
 }
 
-// avoidCollision проверяет наличие файла с таким именем и при конфликте возвращает "name (1).ext"
+// avoidCollision проверяет наличие файла с таким именем
 func avoidCollision(dir, filename string) string {
 	targetPath := filepath.Join(dir, filename)
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {

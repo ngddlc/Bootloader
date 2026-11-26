@@ -39,6 +39,7 @@ type DownloadTask struct {
 	Checksum    string         `json:"checksum"`
 	DuplicateOf string         `json:"duplicate_of,omitempty"`
 	Threads     int            `json:"threads,omitempty"`
+	IsMultiPart bool           `json:"is_multi_part"`
 	TotalSize   int64          `json:"total_size"`
 	Progress    Progress       `json:"progress"`
 	Status      DownloadStatus `json:"status"`

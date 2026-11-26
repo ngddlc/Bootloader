@@ -28,6 +28,7 @@ export namespace domain {
 	    checksum: string;
 	    duplicate_of?: string;
 	    threads?: number;
+	    is_multi_part: boolean;
 	    total_size: number;
 	    progress: Progress;
 	    status: string;
@@ -48,6 +49,7 @@ export namespace domain {
 	        this.checksum = source["checksum"];
 	        this.duplicate_of = source["duplicate_of"];
 	        this.threads = source["threads"];
+	        this.is_multi_part = source["is_multi_part"];
 	        this.total_size = source["total_size"];
 	        this.progress = this.convertValues(source["progress"], Progress);
 	        this.status = source["status"];

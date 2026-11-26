@@ -92,7 +92,7 @@ func (d *MultiDownloader) Download(ctx context.Context, plan *domain.DownloadPla
 					if smoothedSpeed == 0 {
 						smoothedSpeed = instantSpeed
 					} else {
-						// Экспоненциальное сглаживание скорости (EMA) для плавных показаний в GUI
+						// Экспоненциальное сглаживание скорости для плавных показаний в GUI
 						smoothedSpeed = smoothedSpeed*0.65 + instantSpeed*0.35
 					}
 				}

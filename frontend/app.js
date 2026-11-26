@@ -66,6 +66,18 @@ const expandedChecksums = new Set();
             return `<span class="px-2 py-0.5 text-xs font-medium rounded-md border ${style} flex items-center gap-1">${icon} ${category}</span>`;
         }
 
+        // Возвращает стиль бейджа в зависимости от режима загрузки (Многопоточный vs Однопоточный)
+        function getThreadsBadge(task) {
+            if (!task.filename || task.filename === "probing...") {
+                return '<span class="px-2 py-0.5 text-xs font-medium bg-slate-800 text-slate-400 rounded-md border border-slate-700/80 flex items-center gap-1.5" title="Сетевая разведка параметров сервера..."><span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>Разведка...</span>';
+            }
+            const isMulti = task.is_multi_part !== undefined ? task.is_multi_part : (task.threads > 1);
+            if (isMulti && task.threads > 1) {
+                return `<span class="px-2 py-0.5 text-xs font-mono font-medium bg-emerald-500/10 text-emerald-400 rounded-md border border-emerald-500/20 flex items-center gap-1" title="Многопоточная загрузка: сервер поддерживает докачку частями (HTTP 206 Partial Content)">⚡ ${task.threads} потоков (Multi)</span>`;
+            }
+            return '<span class="px-2 py-0.5 text-xs font-mono font-medium bg-amber-500/10 text-amber-400 rounded-md border border-amber-500/20 flex items-center gap-1" title="Однопоточная загрузка: сервер не поддерживает Range-запросы (HTTP 200 OK)">🧵 1 поток (Single)</span>';
+        }
+
         // Возвращает стиль бейджа в зависимости от статуса
         function getStatusBadge(status) {
             switch(status) {
@@ -119,7 +131,7 @@ const expandedChecksums = new Set();
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h3 class="font-medium text-slate-200 text-sm truncate" title="${displayName}">${displayName}</h3>
                                 ${task.category ? getCategoryBadge(task.category) : ''}
-                                <span class="px-2 py-0.5 text-xs font-mono bg-blue-500/10 text-blue-400 rounded-md border border-blue-500/20" title="Количество параллельных потоков">⚡ ${task.threads || 8} потоков</span>
+                                ${getThreadsBadge(task)}
                                 ${task.duplicate_of ? `<span class="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-300 rounded-md border border-amber-500/30 flex items-center gap-1" title="Обнаружен дубликат файла: ${task.duplicate_of}">⚠️ Дубликат: ${task.duplicate_of}</span>` : ''}
                             </div>
                             <p class="text-xs text-slate-500 truncate" title="${task.url}">${task.url}</p>
